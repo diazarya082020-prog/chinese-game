@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Соедини слова — Китайский</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    color: #eee;
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  h1 {
+    font-size: 1.6rem;
+    margin-bottom: 8px;
+    color: #ffd369;
+    text-align: center;
+  }
+  .subtitle {
+    font-size: 0.9rem;
+    color: #aaa;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .stats {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 20px;
+    font-size: 1rem;
+  }
+  .stats span { color: #ffd369; font-weight: bold; }
+  .game-area {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    gap: 60px;
+    width: 100%;
+    max-width: 1000px;
+  }
+  svg#lines {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .column {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 2;
+  }
+  .column h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .item {
+    padding: 10px 14px;
+    background: #1f2a44;
+    border: 2px solid #2e3b5c;
+    border-radius: 10px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s ease;
+    font-size: 1rem;
+    min-width: 140px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .item:hover { background: #2a3a5e; border-color: #4a5f8e; transform: scale(1.03); }
+  .item.hanzi { font-size: 1.3rem; font-weight: bold; color: #ffd369; }
+  .item.selected { border-color: #ffd369; background: #3a2f1e; box-shadow: 0 0 12px rgba(255,211,105,0.5); }
+  .item.matched {
+    border-color: #4caf50;
+    background: #1b3a24;
+    color: #8fe29c;
+    cursor: default;
+    opacity: 0.85;
+  }
+  .item.matched:hover { transform: none; }
+  .item.wrong { animation: shake 0.4s; border-color: #e74c3c; }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+  .message {
+    margin-top: 24px;
+    font-size: 1.2rem;
+    min-height: 30px;
+    color: #4caf50;
+    font-weight: bold;
+    text-align: center;
+  }
+  button.reset {
+    margin-top: 16px;
+    padding: 10px 24px;
+    background: #ffd369;
+    color: #1a1a2e;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  button.reset:hover { background: #ffe49a; }
+  @media (max-width: 700px) {
+    .game-area { gap: 20px; flex-direction: column; }
+    .column { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+    svg#lines { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<h1>连接 иероглиф — пиньинь — перевод</h1>
+<div class="subtitle">Нажмите слово в колонке 1, затем соответствующее в колонке 2, затем перевод в колонке 3</div>
+
+<div class="stats">
+  <div>Соединено: <span id="matched-count">0</span> / 21</div>
+  <div>Ошибок: <span id="error-count">0</span></div>
+</div>
+
+<div class="game-area" id="game-area">
+  <svg id="lines"></svg>
+  <div class="column" id="col-hanzi"><h2>Иероглиф</h2></div>
+  <div class="column" id="col-pinyin"><h2>Пиньинь</h2></div>
+  <div class="column" id="col-trans"><h2>Перевод</h2></div>
+</div>
+
+<div class="message" id="message"></div>
+<button class="reset" id="reset">Начать заново</button>
+
+<script>
+const DATA = [
+  { id: 1,  hanzi: "过",           pinyin: "guo",              trans: "обозначает прошедшее время" },
+  { id: 2,  hanzi: "越剧",         pinyin: "yuèjù",            trans: "шаосинская опера" },
+  { id: 3,  hanzi: "剧",           pinyin: "jù",               trans: "опера" },
+  { id: 4,  hanzi: "剧团",         pinyin: "jùtuán",           trans: "труппа" },
+  { id: 5,  hanzi: "地方戏",       pinyin: "dìfāngxì",         trans: "местная опера" },
+  { id: 6,  hanzi: "戏",           pinyin: "xì",               trans: "театр, опера" },
+  { id: 7,  hanzi: "上演",         pinyin: "shàngyǎn",         trans: "начинать выступать" },
+  { id: 8,  hanzi: "古典",         pinyin: "gǔdiǎn",           trans: "классический" },
+  { id: 9,  hanzi: "小说",         pinyin: "xiǎoshuō",         trans: "роман" },
+  { id: 10, hanzi: "遍",           pinyin: "biàn",             trans: "раз" },
+  { id: 11, hanzi: "部",           pinyin: "bù",               trans: "счетное слово для фильма/романа" },
+  { id: 12, hanzi: "爱情",         pinyin: "àiqíng",           trans: "любовь" },
+  { id: 13, hanzi: "故事",         pinyin: "gùshi",            trans: "рассказ" },
+  { id: 14, hanzi: "感人",         pinyin: "gǎnrén",           trans: "трогательный" },
+  { id: 15, hanzi: "座位",         pinyin: "zuòwèi",           trans: "место" },
+  { id: 16, hanzi: "排",           pinyin: "pái",              trans: "ряд" },
+  { id: 17, hanzi: "西边",         pinyin: "xībian",           trans: "западная сторона" },
+  { id: 18, hanzi: "见",           pinyin: "jiàn",             trans: "видеть" },
+  { id: 19, hanzi: "长安大戏院",   pinyin: "Cháng'ān Dà Xìyuàn", trans: "Оперный театр Чанъань" },
+  { id: 20, hanzi: "《红楼梦》",    pinyin: "Hónglóu Mèng",     trans: "«Сон в красном тереме»" },
+  { id: 21, hanzi: "梦",           pinyin: "mèng",             trans: "сон" }
+];
+
+const colHanzi = document.getElementById('col-hanzi');
+const colPinyin = document.getElementById('col-pinyin');
+const colTrans = document.getElementById('col-trans');
+const svg = document.getElementById('lines');
+const messageEl = document.getElementById('message');
+const matchedCountEl = document.getElementById('matched-count');
+const errorCountEl = document.getElementById('error-count');
+
+let selected = [];        // выбранные элементы (по порядку: hanzi, pinyin, trans)
+let matchedIds = new Set();
+let errors = 0;
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function createItem(text, type, dataId) {
+  const div = document.createElement('div');
+  div.className = 'item ' + (type === 'hanzi' ? 'hanzi' : '');
+  div.textContent = text;
+  div.dataset.id = dataId;
+  div.dataset.type = type;
+  div.addEventListener('click', () => onItemClick(div));
+  return div;
+}
+
+function buildBoard() {
+  colHanzi.querySelectorAll('.item').forEach(e => e.remove());
+  colPinyin.querySelectorAll('.item').forEach(e => e.remove());
+  colTrans.querySelectorAll('.item').forEach(e => e.remove());
+
+  shuffle(DATA).forEach(d => colHanzi.appendChild(createItem(d.hanzi, 'hanzi', d.id)));
+  shuffle(DATA).forEach(d => colPinyin.appendChild(createItem(d.pinyin, 'pinyin', d.id)));
+  shuffle(DATA).forEach(d => colTrans.appendChild(createItem(d.trans, 'trans', d.id)));
+}
+
+function clearLines() {
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+}
+
+function getCenter(el) {
+  const gameArea = document.getElementById('game-area').getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+  return { x: r.left - gameArea.left + r.width / 2, y: r.top - gameArea.top + r.height / 2 };
+}
+
+function drawLine(a, b, color) {
+  const p1 = getCenter(a);
+  const p2 = getCenter(b);
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+  line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+  line.setAttribute('stroke', color || '#4caf50');
+  line.setAttribute('stroke-width', '3');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('opacity', '0.8');
+  line.dataset.id = a.dataset.id;
+  svg.appendChild(line);
+}
+
+function onItemClick(el) {
+  if (el.classList.contains('matched')) return;
+  if (matchedIds.has(el.dataset.id)) return;
+
+  const type = el.dataset.type;
+  const expectedTypes = ['hanzi', 'pinyin', 'trans'];
+  const expectedType = expectedTypes[selected.length];
+
+  // Клик по уже выбранному — снять выделение
+  if (el.classList.contains('selected')) {
+    el.classList.remove('selected');
+    selected = selected.filter(s => s !== el);
+    return;
+  }
+
+  // Если клик не по той колонке — сброс и попытка заново
+  if (type !== expectedType) {
+    selected.forEach(s => s.classList.remove('selected'));
+    selected = [];
+    if (type === 'hanzi') {
+      el.classList.add('selected');
+      selected.push(el);
+    }
+    return;
+  }
+
+  el.classList.add('selected');
+  selected.push(el);
+
+  if (selected.length === 3) {
+    checkTriple();
+  }
+}
+
+function checkTriple() {
+  const [a, b, c] = selected;
+  const allSame = a.dataset.id === b.dataset.id && b.dataset.id === c.dataset.id;
+
+  if (allSame) {
+    matchedIds.add(a.dataset.id);
+    a.classList.add('matched');
+    b.classList.add('matched');
+    c.classList.add('matched');
+    a.classList.remove('selected');
+    b.classList.remove('selected');
+    c.classList.remove('selected');
+    drawLine(a, b, '#4caf50');
+    drawLine(b, c, '#4caf50');
+    matchedCountEl.textContent = matchedIds.size;
+    messageEl.style.color = '#4caf50';
+    messageEl.textContent = 'Правильно! ✓';
+    if (matchedIds.size === DATA.length) {
+      messageEl.textContent = `🎉 Поздравляем! Все ${DATA.length} слов соединены! Ошибок: ${errors}`;
+    }
+  } else {
+    errors++;
+    errorCountEl.textContent = errors;
+    messageEl.style.color = '#e74c3c';
+    messageEl.textContent = 'Неверно, попробуйте ещё раз';
+    selected.forEach(s => s.classList.add('wrong'));
+    setTimeout(() => {
+      selected.forEach(s => {
+        s.classList.remove('wrong');
+        s.classList.remove('selected');
+      });
+      selected = [];
+    }, 500);
+    return;
+  }
+  selected = [];
+}
+
+function resetGame() {
+  selected = [];
+  matchedIds = new Set();
+  errors = 0;
+  matchedCountEl.textContent = '0';
+  errorCountEl.textContent = '0';
+  messageEl.textContent = '';
+  clearLines();
+  buildBoard();
+}
+
+document.getElementById('reset').addEventListener('click', resetGame);
+
+// Перерисовка линий при изменении размера окна
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    clearLines();
+    matchedIds.forEach(id => {
+      const items = document.querySelectorAll(`.item.matched[data-id="${id}"]`);
+      const list = Array.from(items);
+      const h = list.find(e => e.dataset.type === 'hanzi');
+      const p = list.find(e => e.dataset.type === 'pinyin');
+      const t = list.find(e => e.dataset.type === 'trans');
+      if (h && p) drawLine(h, p, '#4caf50');
+      if (p && t) drawLine(p, t, '#4caf50');
+    });
+  }, 150);
+});
+
+buildBoard();
+</script>
+</body>
+</html>
